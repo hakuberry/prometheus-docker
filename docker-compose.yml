@@ -1,0 +1,104 @@
+version: "3.9"
+services:
+  prometheus:
+   
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./data/prometheus/config:/etc/prometheus/
+      - ./data/prometheus/data:/prometheus
+    expose:
+      - 9090
+    ports:
+      - 9090:9090
+
+  dev-consul-server:
+    image: hashicorp/consul:latest
+    container_name: dev-consul-server
+    restart: unless-stopped
+    expose:
+      - 8600/udp
+      - 8500
+      - 8400
+      - 8300
+    ports: 
+      - "8300:8300"
+      - "8400:8400"
+      - "8500:8500"
+      - "8600:8600"
+      - "8600:8600/udp"
+    volumes: 
+      - ./consul.d/:/consul/config:rw
+    environment: 
+      - CONSUL_BOOTSTRAP_EXPECT=3
+      - CONSUL_CLIENT_LAN_ADDRESS=0.0.0.0
+      - CONSUL_DISABLE_KEYRING_FILE=true
+      - CONSUL_RETRY_JOIN=dev-consul-server
+    command: [ "consul", "agent", "-bootstrap-expect=1", "-server", "-data-dir=/consul/data", "-bind={{ GetInterfaceIP \"eth0\" }}", "-client=0.0.0.0", "-ui"]
+
+  alert-manager:
+    image: prom/alertmanager:latest
+    container_name: alert-manager
+    ports:
+      - 9093:9093
+    volumes:
+      - ./data/alertmanager/alertmanager.yml:/alertmanager.yml
+    command: ["--config.file=/alertmanager.yml"]
+
+  node-exporter:    
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    expose:
+      - 9100
+    ports:
+      - 9100:9100  
+    
+  cadvisor:
+    container_name: cadvisor
+    image: 127.0.0.1:5000/cadvisor
+    build:
+      dockerfile: Dockerfile
+      args:
+        VERSION: "v0.44.0"
+      cache_from:
+        - golang:buster
+        - alpine:latest
+    command:
+      - '--allow_dynamic_housekeeping=true'
+      - '--housekeeping_interval=30s'
+      - '--docker_only=true'
+      - '--storage_duration=1m0s'
+      - '--event_storage_age_limit=default=0'
+      - '--event_storage_event_limit=default=0'
+      - '--global_housekeeping_interval=30s'
+      - '--disable_metrics=accelerator,cpu_topology,disk,memory_numa,tcp,udp,percpu,sched,process,hugetlb,referenced_memory,resctrl,cpuset,advtcp,memory_numa'
+      - '--store_container_labels=false'
+    restart: unless-stopped
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    expose:
+      - 8080
+    ports: 
+      - 8080:8080 
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /etc/machine-id:/etc/machine-id:ro
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    volumes:
+      - ./data/grafana:/var/lib/grafana:rw
+    expose:
+      - 3000
+    ports:
+      - 3000:3000
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=ifcspassword
+      - GF_USERS_ALLOW_SIGN_UP=false

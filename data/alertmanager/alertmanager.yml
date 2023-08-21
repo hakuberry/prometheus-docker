@@ -1,0 +1,10 @@
+route:
+  group_by: [cluster]
+  receiver: discord
+
+
+receivers:
+- name: discord
+  discord_configs:
+  - webhook_url: https://discord.com/api/webhooks/1142874384860717217/yMUP8BwWtQSnwCMKLCLyzucAIK1cJT_ndQS9uW3bHF5ST9J-OKecOiXAG_k79xZc8sNc
+    send_resolved: true
